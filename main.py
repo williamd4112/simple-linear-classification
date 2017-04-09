@@ -2,20 +2,17 @@ import argparse
 import sys
 import logging
 import numpy as np
+from scipy.cluster.vq import whiten
 
 from util import one_hot
 from preprocess import Preprocessor
 from model_np import ProbabilisticGenerativeModel, LogisticRegressionModel
 
-INPUT_SPACE_RANGE = 255.0
-
 def get_model(args, num_classes):
     if args.model == 'gen':
         return ProbabilisticGenerativeModel(num_classes)
-    elif args.model == 'dis-sgd':
-        return LogisticRegressionModel(num_classes, optimizer='sgd', lr=args.lr)
     else:
-        return LogisticRegressionModel(num_classes)
+        return LogisticRegressionModel(num_classes, lr=args.lr)
 
 def evaluate(args, model, x_, t_):
     sess = None
@@ -33,8 +30,8 @@ def train(args):
     parts = np.zeros([num_classes, 2], dtype=np.int32)
     count = 0
     for i in xrange(num_classes):
-        x = np.matrix(np.load(datasets[i]))
-        y = np.tile(one_hot(num_classes, i), [len(x), 1])
+        x = np.matrix(np.load(datasets[i]), dtype=np.float32)
+        y = np.tile(one_hot(num_classes, i), [len(x), 1]).astype(dtype=np.float32)
         parts[i, 0] = count
         parts[i, 1] = len(x)
         X.append(x)
@@ -48,11 +45,11 @@ def train(args):
  
     # Preprocess datasets
     logging.info('Preprocessing %d data...' % num_samples)
-    X_normal = Preprocessor().normalize(X, INPUT_SPACE_RANGE)
+    X_normal = whiten(X)
     X_phi = Preprocessor().pca(X_normal, k=args.d)
     bias = np.ones(num_samples)[:, np.newaxis]
     X_phi = np.hstack((X_phi, bias))
-
+    
     # Partitioning datasets
     logging.info('Partitioning datasets...')
     X_phi_Train = []
@@ -107,9 +104,10 @@ def train(args):
     for k in xrange(num_classes):
         logging.info('# class-%d = %d' % (k, Y_Train[Y_Train.argmax(axis=1) == k].shape[0]))
 
-    logging.info('Use model %s with %d-dim feautre space' % (args.model, args.d))
+    logging.info('Use model %s with %d-dim (with bias) feautre space' % (args.model, X_phi.shape[1]))
     sess = None
     model = get_model(args, num_classes)
+    logging.info('Training...')
     model.fit(sess, X_phi_Train, Y_Train, args.epoch, args.batch_size)
 
     logging.info('Evaluating...')
@@ -122,7 +120,7 @@ if __name__ == '__main__':
             choices=['train', 'test'], type=str, default='train')
     parser.add_argument('--X', help='data (ordered)', required=True, type=str)
     parser.add_argument('--model', help='gen/dis model', 
-            choices=['gen', 'dis-newton', 'dis-sgd'], type=str, default='dis-newton')
+            choices=['gen', 'dis'], type=str, default='dis')
     parser.add_argument('--permu', help='train/test task', 
             choices=['unbalance', 'balance'], type=str, default='unbalance')
     parser.add_argument('--d', help='pca dimension', type=int, default=2)

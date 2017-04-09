@@ -11,14 +11,9 @@ def softmax(a):
     return e / e.sum(axis=1)[:, np.newaxis]
 
 class LogisticRegressionModel(object):
-    '''
-        Linear model for logistic regression
-        Optimize via Newton-Raphson method
-    '''
-    def __init__(self, num_classes, optimizer='netwon', lr=0.01):
+    def __init__(self, num_classes, lr=0.01):
         self.classes = np.identity(num_classes)
         self.num_classes = num_classes
-        self.optimizer = optimizer
         self.lr = lr
         self.w_k = None
 
@@ -39,11 +34,11 @@ class LogisticRegressionModel(object):
             np.random.shuffle(indices)
             for begin in xrange(0, num_sample, batch_size):
                 end = min(num_sample, begin + batch_size)
-                x_train = x_[begin:end]
-                t_train = t_[begin:end]
+                x_train = x_[indices[begin:end]]
+                t_train = t_[indices[begin:end]]
                 self._optimize(sess, x_train, t_train)
-            acc = self.eval(sess, x_, t_)
-            logging.info('Training accuracy = %f' % acc)
+                acc = self.eval(sess, x_, t_)
+            logging.info('Epoch %d Training accuracy = %f' % (epoch, acc))
         
     def eval(self, sess, x_, t_):
         y = np.asarray(self.test(sess, x_))
@@ -70,7 +65,7 @@ class LogisticRegressionModel(object):
         for j in xrange(K):
             for n in xrange(N):
                 grad[j, :] += (y[n,j] - t[n,j]) * x[n]
-        grad = grad.flatten()
+        grad = -grad.flatten()
  
         # Calculate Hessian matrix
         I = np.identity(K)
@@ -80,11 +75,11 @@ class LogisticRegressionModel(object):
                 D_wjk = np.zeros([M, M])
                 for n in xrange(N):
                     D_wjk += y[n,k] * (I[k,j] - y[n,j]) * x.T.dot(x)
-                H[j*(M):(j+1)*M, (k)*M:(k+1)*M] = D_wjk
+                H[j*(M):(j+1)*M, (k)*M:(k+1)*M] = -D_wjk
         try:
             H_inv = np.linalg.pinv(H)
         except np.linalg.linalg.LinAlgError:
-            H_inv = np.linalg.pinv(H)
+            return
 
         # Update weight
         w_old = self.w_k.flatten()
@@ -99,10 +94,6 @@ class ProbabilisticGenerativeModel(object):
         self.w0_k = {}
     
     def fit(self, sess, x_, t_, epoch=None, batch_size=None):
-        '''
-            param x_: training datas
-            param c: classes 
-        '''
         n = len(x_)
         nc = len(self.classes)
 

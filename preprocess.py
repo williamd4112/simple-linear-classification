@@ -8,7 +8,7 @@ from numpy import vstack,array
 from numpy.random import rand
 
 class Preprocessor(object):
-    def pca(self, X, k): 
+    def pca(self, X, k):
         '''
             Calculate covariance matrix
         '''
