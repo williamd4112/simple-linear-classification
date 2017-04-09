@@ -24,13 +24,15 @@ class Preprocessor(object):
         '''
         eig_pairs = [(np.abs(eig_val_cov[i]), eig_vec_cov[:,i]) for i in range(len(eig_val_cov))]
         eig_pairs.sort(key=lambda x: x[0], reverse=True)
-        eig_pairs = np.matrix([eig_pairs[i][1] for i in xrange(k)])
+        eig_pairs = np.array([eig_pairs[i][1] for i in xrange(k)])
         
-        return X.dot(eig_pairs.T)
+        return X.dot(eig_pairs.T), eig_pairs
        
 
-    def normalize(self, X, rng):
-        return X / rng
+    def normalize(self, X):
+        obs = X
+        std_dev = np.std(obs, axis=0)
+        return obs / std_dev, std_dev
 
 if __name__ == '__main__':
     from util import load_categorical_dataset

@@ -11,20 +11,33 @@ def softmax(a):
     return e / e.sum(axis=1)[:, np.newaxis]
 
 class LogisticRegressionModel(object):
-    def __init__(self, num_classes, lr=0.01):
-        self.classes = np.identity(num_classes)
-        self.num_classes = num_classes
+    def __init__(self, n_classes=1, lr=1.0, tolerance=0.1):
+        self.classes = np.identity(n_classes)
+        self.n_classes = n_classes
         self.lr = lr
         self.w_k = None
+        self.tolerance = tolerance
+   
+    def save(self, path):
+        np.save(path, self.w_k)
+        logging.info('Saving model to %s success [K = %d, M = %d]' % (path, self.w_k.shape[0], self.w_k.shape[1]))
+
+    def load(self, path):
+        self.w_k = np.load(path)
+        self.n_classes = self.w_k.shape[0]
+        self.n_features = self.w_k.shape[1]
+        logging.info('Loading model from %s success [K = %d, M = %d]' % (path, self.w_k.shape[0], self.w_k.shape[1]))
 
     def fit(self, sess, x_, t_, epochs=1, batch_size=2400):
         assert len(x_.shape) == 2
         
         # Initialize weight for each class
         M = x_.shape[1:][0]
-        K = self.num_classes
+        K = self.n_classes
         self.w_k = np.zeros([K, M])
-        
+        self.n_classes = self.w_k.shape[0]
+        self.n_features = self.w_k.shape[1]
+
         # Iterative optimize
         num_sample = len(x_)
         indices = range(num_sample)
@@ -37,8 +50,12 @@ class LogisticRegressionModel(object):
                 x_train = x_[indices[begin:end]]
                 t_train = t_[indices[begin:end]]
                 self._optimize(sess, x_train, t_train)
-                acc = self.eval(sess, x_, t_)
-            logging.info('Epoch %d Training accuracy = %f' % (epoch, acc))
+            acc = self.eval(sess, x_, t_)
+            logging.info('Epoch %d Training accuracy = %f, error rate = %f' % (epoch, acc, 1.0 - acc))
+
+            if 1.0 - acc < self.tolerance:
+                logging.info('Target error rate reached.')
+                break
         
     def eval(self, sess, x_, t_):
         y = np.asarray(self.test(sess, x_))
@@ -54,7 +71,7 @@ class LogisticRegressionModel(object):
 
     def _optimize(self, sess, x_, t_):
         N, M = x_.shape
-        K = self.num_classes
+        K = self.n_classes
         
         x = np.asarray(x_)
         y = np.asarray(self.test(sess, x_))
@@ -88,46 +105,59 @@ class LogisticRegressionModel(object):
         self.w_k = w_new
 
 class ProbabilisticGenerativeModel(object):
-    def __init__(self, num_classes):
-        self.classes = np.identity(num_classes)
-        self.w_k = {}
-        self.w0_k = {}
+    def __init__(self, n_classes=1):
+        self.classes = np.identity(n_classes)
+        self.n_classes = n_classes
+
+    def save(self, path):
+        w = np.hstack((self.w0_k[:, np.newaxis], self.w_k))
+        np.save(path, w)
+        logging.info('Saving model to %s success [K = %d, M = %d]' % (path, w.shape[0], w.shape[1]))
+
+    def load(self, path):
+        w = np.load(path)
+        self.w_k = w[:, 1:]
+        self.w0_k = w[:, 0]
+        self.classes = np.identity(w.shape[0])
+
+        self.n_classes = w.shape[0]
+        self.n_features = w.shape[1]
+        logging.info('Loading model from %s success [K = %d, M = %d]' % (path, w.shape[0], w.shape[1]))
     
     def fit(self, sess, x_, t_, epoch=None, batch_size=None):
-        n = len(x_)
-        nc = len(self.classes)
-
         assert len(x_.shape) == 2
-        
-        d = x_.shape[1:][0]
-        priors = np.asmatrix(np.zeros([nc, 1]))
-        means = np.asmatrix(np.zeros([nc, d]))
-        sigma = np.asmatrix(np.zeros([d, d]))
+
+        N, M = x_.shape
+        K = len(self.classes)
+        self.n_features = M
+        self.w_k = np.zeros([K, M-1])
+        self.w0_k = np.zeros([K])
+
+        priors = np.zeros([K, 1])
+        means = np.zeros([K, M-1])
+        sigma = np.zeros([M, M-1])
     
-        for class_i, i in zip(self.classes, range(nc)):
-            x_i = x_[t_[:, i] == 1]
+        for class_i, i in zip(self.classes, range(K)):
+            x_i = x_[t_[:, i] == 1][:, 1:]
             n_i = len(x_i)
-            priors[i] = float(n_i) / n
+
+            priors[i] = float(n_i) / N
             means[i] = np.mean(x_i, axis=0)
-            sigma = (float(n_i) / n) * ((x_i - means[i]).T * (x_i - means[i])) / float(n_i)
-        sigma_inv = np.linalg.pinv(sigma)
+            sigma = (float(n_i) / N) * ((x_i - means[i]).T.dot(x_i - means[i])) / float(n_i)
+        sigma_inv = np.asarray(np.linalg.pinv(sigma))
         
-        for i in xrange(nc):
-            self.w_k[i] = sigma_inv * means[i].T
-            self.w0_k[i] = (-1.0 / 2) * means[i] * sigma_inv * means[i].T + np.log(priors[i])
-    
+        for i in xrange(K):
+            self.w_k[i, :] = (sigma_inv.dot(means[i]))
+            self.w0_k[i] = (-1.0 / 2) * means[i].T.dot(sigma_inv.dot(means[i])) + np.log(priors[i])
+   
     def test(self, sess, x_):
-        n = len(x_)
-        m = len(self.classes)
-
-        a_k = np.zeros([n, m])
-        x_mat = np.matrix(x_)
-        for i in xrange(m):
-            a_k[:, i] = np.squeeze(np.asarray(x_mat * self.w_k[i] + self.w0_k[i]))
-        a_k = softmax(a_k)
-        y = np.asarray(self.classes)[a_k.argmax(axis=1)]
-
-        return y
+        N = len(x_)
+        K = len(self.classes)
+        a_k = np.zeros([N, K])
+        x = np.asarray(x_[:, 1:])
+        for k in xrange(K):
+            a_k[:, k] = self.w_k[k, :].dot(x.T) + self.w0_k[k]
+        return softmax(a_k)
 
     def eval(self, sess, x_, t_):
         y = self.test(sess, x_)

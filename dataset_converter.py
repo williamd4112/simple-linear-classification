@@ -7,6 +7,13 @@ from tqdm import *
 from os import listdir
 from os.path import isfile, join
 
+
+'''
+    Recursively load images in the directory and concate images together into a numpy array
+    mypath: input directory
+    out: output directory
+'''
+
 mypath = sys.argv[1]
 out = sys.argv[2]
 
