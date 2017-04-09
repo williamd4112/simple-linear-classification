@@ -7,8 +7,7 @@ from sklearn import linear_model
 
 def softmax(a):
     e = np.exp(a)
-    s = e.sum(axis=1)[:, np.newaxis]
-
+    s = e.sum(axis=1)
     return e / e.sum(axis=1)[:, np.newaxis]
 
 class LogisticRegressionModel(object):
@@ -27,9 +26,9 @@ class LogisticRegressionModel(object):
         assert len(x_.shape) == 2
         
         # Initialize weight for each class
-        D = x_.shape[1:][0]
+        M = x_.shape[1:][0]
         K = self.num_classes
-        self.w_k = np.asmatrix(np.zeros([K, D]))
+        self.w_k = np.zeros([K, M])
         
         # Iterative optimize
         num_sample = len(x_)
@@ -42,63 +41,57 @@ class LogisticRegressionModel(object):
                 end = min(num_sample, begin + batch_size)
                 x_train = x_[begin:end]
                 t_train = t_[begin:end]
-                if self.optimizer == 'sgd':
-                    self._optimize_gradient_descent(sess, x_train, t_train)
-                else:
-                    self._optimize(sess, x_train, t_train)
+                self._optimize(sess, x_train, t_train)
             acc = self.eval(sess, x_, t_)
             logging.info('Training accuracy = %f' % acc)
         
     def eval(self, sess, x_, t_):
         y = np.asarray(self.test(sess, x_))
-        acc = float(np.equal(y.argmax(axis=1), t_.argmax(axis=1)).sum()) / len(t_) 
+        t = np.asarray(t_)
+        acc = float(np.equal(y.argmax(axis=1), t.argmax(axis=1)).sum()) / len(t_) 
         return acc
                                
     def test(self, sess, x_):
-        return softmax(np.asarray(np.asmatrix(x_) * np.asmatrix(self.w_k).T))
-
-    def _optimize_gradient_descent(self, sess, x_, t_): 
-        self.w_k = self.w_k - self.lr * self._gradient(sess, x_, t_)
+        x = np.asarray(x_)
+        w = np.asarray(self.w_k)
+        y = softmax(x.dot(w.T))
+        return y
 
     def _optimize(self, sess, x_, t_):
-        D = x_.shape[1:][0]
-        N = len(x_)
+        N, M = x_.shape
         K = self.num_classes
-
-        X = np.asmatrix(x_)
-        T = np.asmatrix(t_)
-        Y = np.asmatrix(self.test(sess, x_)) 
-        grad = self._gradient(sess, x_, t_).reshape([K * D, 1])
-        H = self._hessian(sess, X, Y, T)
-        H_inv = np.linalg.inv(H)
-       
-        W_old = np.asmatrix(np.reshape(self.w_k, [K * D, 1]))
-        W_new = W_old - H_inv * grad
-        self.w_k = W_new.reshape([K, D])
-    
-    def _gradient(self, sess, x_, t_):
-        Y = np.asmatrix(self.test(sess, x_))
-        grad = (x_.T * (Y - t_)).T
-        return grad
-    
-    def _hessian(self, sess, x_, y_, t_):
-        N = len(x_)
-        D = x_.shape[1:][0]
-        C = len(self.classes)
-        I = np.identity(C)
-        X = np.asmatrix(x_)
-        y = np.asarray(y_)
-        Y = np.asmatrix(y_)
-        H = np.zeros([D*C, D*C])
         
-        for k in xrange(C):
-            for j in xrange(C):
-                B = np.zeros([D, D])
-                for n in xrange(N):
-                    B += Y[n,k] * (I[j,k] - Y[n,j]) * (X[n].T * X[n])
-                H[k*D:(k+1)*D, j*D:(j+1)*D] = B
-        return H
+        x = np.asarray(x_)
+        y = np.asarray(self.test(sess, x_))
+        t = np.asarray(t_)
+
+        # Calculate gradient
+        grad = np.zeros([K, M])
+        for j in xrange(K):
+            for n in xrange(N):
+                grad[j, :] += (y[n,j] - t[n,j]) * x[n]
+        grad = grad.flatten()
  
+        # Calculate Hessian matrix
+        I = np.identity(K)
+        H = np.zeros([K*M, K*M])
+        for j in xrange(K):
+            for k in xrange(K):
+                D_wjk = np.zeros([M, M])
+                for n in xrange(N):
+                    D_wjk += y[n,k] * (I[k,j] - y[n,j]) * x.T.dot(x)
+                H[j*(M):(j+1)*M, (k)*M:(k+1)*M] = D_wjk
+        try:
+            H_inv = np.linalg.pinv(H)
+        except np.linalg.linalg.LinAlgError:
+            H_inv = np.linalg.pinv(H)
+
+        # Update weight
+        w_old = self.w_k.flatten()
+        w_new = w_old - self.lr * H_inv.dot(grad)
+        w_new = w_new.reshape([K, M])
+        self.w_k = w_new
+
 class ProbabilisticGenerativeModel(object):
     def __init__(self, num_classes):
         self.classes = np.identity(num_classes)
@@ -126,7 +119,7 @@ class ProbabilisticGenerativeModel(object):
             priors[i] = float(n_i) / n
             means[i] = np.mean(x_i, axis=0)
             sigma = (float(n_i) / n) * ((x_i - means[i]).T * (x_i - means[i])) / float(n_i)
-        sigma_inv = np.linalg.inv(sigma)
+        sigma_inv = np.linalg.pinv(sigma)
         
         for i in xrange(nc):
             self.w_k[i] = sigma_inv * means[i].T
@@ -142,10 +135,12 @@ class ProbabilisticGenerativeModel(object):
             a_k[:, i] = np.squeeze(np.asarray(x_mat * self.w_k[i] + self.w0_k[i]))
         a_k = softmax(a_k)
         y = np.asarray(self.classes)[a_k.argmax(axis=1)]
+
         return y
 
     def eval(self, sess, x_, t_):
         y = self.test(sess, x_)
-        acc = float(np.equal(y.argmax(axis=1), t_.argmax(axis=1)).sum()) / len(t_) 
+        t = np.asarray(t_)
+        acc = float(np.equal(np.argmax(y, axis=1), np.argmax(t, axis=1)).sum()) / len(t) 
         return acc
 
