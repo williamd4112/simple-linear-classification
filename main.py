@@ -2,10 +2,11 @@ import argparse
 import sys
 import logging
 import numpy as np
+
 from tqdm import * 
-from scipy.cluster.vq import whiten
 
 from util import one_hot
+from plot import plot_decision_boundary
 from preprocess import Preprocessor
 from model_np import ProbabilisticGenerativeModel, LogisticRegressionModel
 
@@ -43,7 +44,11 @@ def preprocess(args, X, k=None):
     if k == None:
         k = args.d
     X_normal, std = Preprocessor().normalize(X)
-    X_phi, phi = Preprocessor().pca(X_normal, k=k)
+    if args.pre == 'pca':
+        X_phi, phi = Preprocessor().pca(X_normal, k=k)
+    else:
+        X_phi = X
+        phi = np.ones(k)
     bias = np.ones(len(X))[:, np.newaxis]
     X_phi = np.hstack((bias, X_phi))
     
@@ -56,6 +61,19 @@ def preprocess_test(X, std, phi):
     X_phi = np.hstack((bias, X_phi))
     return X_phi
 
+def plot(args):
+    assert args.load != None
+    model, std, phi = load(args)
+    sess = None
+    
+    def func(X):    
+        bias = np.ones(len(X))[:, np.newaxis]
+        X_phi = np.hstack((bias, X))
+        y = model.test(sess, X_phi)
+        return y.argmax(axis=1)
+    
+    plot_decision_boundary(func, -1000, -1000, 1000, 1000, 1) 
+        
 def test(args):
     assert args.output != None and args.load != None
     X = []
@@ -88,7 +106,7 @@ def test(args):
     with open(args.output, 'w') as csv_file:
         for yn in tqdm(y_one_hot):
             csv_file.write(','.join([str(yn_i) for yn_i in yn]) + '\n')
-         
+
 def train(args):
     FRAC = args.frac
     X = []
@@ -209,14 +227,16 @@ def train(args):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--task', help='train/test task', 
-            choices=['train', 'test', 'validate', 'eval'], type=str, default='validate')
-    parser.add_argument('--X', help='data (ordered)', required=True, type=str)
+            choices=['train', 'test', 'validate', 'eval', 'plot'], type=str, default='validate')
+    parser.add_argument('--X', help='data (ordered)', type=str)
     parser.add_argument('--load', help='pre-trained model path', type=str, default=None)
     parser.add_argument('--basis', help='pre-trained model basis path', type=str, default=None)
     parser.add_argument('--std', help='pre-trained model stddev path', type=str, default=None)
     parser.add_argument('--output', help='model output', type=str, default=None)
     parser.add_argument('--model', help='gen/dis model', 
             choices=['gen', 'dis'], type=str, default='dis')
+    parser.add_argument('--pre', help='gen/dis model', 
+            choices=['pca', 'hist'], type=str, default='pca')
     parser.add_argument('--permu', help='train/test task', 
             choices=['unbalance', 'balance'], type=str, default='unbalance')
     parser.add_argument('--d', help='pca dimension', type=int, default=2)
@@ -230,5 +250,7 @@ if __name__ == '__main__':
     logging.basicConfig(format='[%(asctime)s] %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
     if args.task == 'test':
         test(args)
+    elif args.task == 'plot':
+        plot(args)
     else:
         train(args)
