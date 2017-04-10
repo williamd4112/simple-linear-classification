@@ -2,7 +2,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def plot_decision_boundary(func, x_min, y_min, x_max, y_max, h):
+def plot_decision_boundary(func, x_, t_, x_min, y_min, x_max, y_max, h):
     # Plot the decision boundary. For that, we will assign a color to each
     # point in the mesh [x_min, x_max]x[y_min, y_max].
     xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
@@ -15,7 +15,7 @@ def plot_decision_boundary(func, x_min, y_min, x_max, y_max, h):
     plt.pcolormesh(xx, yy, Z, cmap=plt.cm.Paired)
 
     # Plot also the training points
-    #plt.scatter(X[:, 0], X[:, 1], c=Y, edgecolors='k', cmap=plt.cm.Paired)
+    plt.scatter(x_[:, 0], x_[:, 1], c=t_, edgecolors='k', cmap=plt.cm.Paired)
     plt.xlabel('x1')
     plt.ylabel('x2')
 

@@ -48,15 +48,16 @@ def evaluate(args, model, x_, t_):
     accuracy = model.eval(sess, x_, t_)
     logging.info('Accuracy = %f' % accuracy)
 
-def preprocess(args, X, k=None):
-    if k == None:
-        k = args.d
+def preprocess(args, X, T):
+    d = args.d
     X_normal, std = Preprocessor().normalize(X)
     if args.pre == 'pca':
-        X_phi, phi = Preprocessor().pca(X_normal, k=k)
+        X_phi, phi = Preprocessor().pca(X_normal, k=d)
+    elif args.pre == 'lda':
+        X_phi, phi = Preprocessor().lda(X_normal, T, d=d)
     else:
         X_phi = X
-        phi = np.ones(k)
+        phi = np.ones(d)
     bias = np.ones(len(X))[:, np.newaxis]
     X_phi = np.hstack((bias, X_phi))
     
@@ -69,18 +70,46 @@ def preprocess_test(X, std, phi):
     X_phi = np.hstack((bias, X_phi))
     return X_phi
 
+def load_dataset_with_class(args):
+    X = []
+    Y = []
+
+    # Load datasets class by class
+    datasets = args.X.split(',')
+    num_classes = len(datasets)
+    parts = np.zeros([num_classes, 2], dtype=np.int32)
+    count = 0
+    for i in xrange(num_classes):
+        x = np.matrix(np.load(datasets[i]), dtype=np.float32)
+        y = np.tile(one_hot(num_classes, i), [len(x), 1]).astype(dtype=np.float32)
+        parts[i, 0] = count
+        parts[i, 1] = len(x)
+        X.append(x)
+        Y.append(y)
+        count += len(x)
+        logging.info('Load %d data for class %d' % (len(x), i))
+    X = np.asarray(np.concatenate(X))
+    Y = np.asarray(np.concatenate(Y))
+
+    return X, Y, parts
+
 def plot(args):
     assert args.load != None
     model, std, phi = load(args)
     sess = None
-    
+
+    # for plotting training data    
+    x_, t_, _ = load_dataset_with_class(args)
+    x_phi = preprocess_test(x_, std, phi)[:, 1:]
+
     def func(X):    
+        # X consists of feature vector components
         bias = np.ones(len(X))[:, np.newaxis]
         X_phi = np.hstack((bias, X))
         y = model.test(sess, X_phi)
         return y.argmax(axis=1)
-    
-    plot_decision_boundary(func, -1000, -1000, 1000, 1000, 1) 
+
+    plot_decision_boundary(func, x_phi, t_, x_phi.min(), x_phi.min(), x_phi.max(), x_phi.max(), 0.01) 
         
 def test(args):
     assert args.output != None and args.load != None
@@ -116,7 +145,6 @@ def test(args):
             csv_file.write(','.join([str(yn_i) for yn_i in yn]) + '\n')
 
 def train(args):
-    FRAC = args.frac
     X = []
     Y = []
     
@@ -152,7 +180,7 @@ def train(args):
         model = get_model(args)
         # Preprocess datasets
         logging.info('Preprocessing %d data...' % num_samples)
-        X_phi, phi, std = preprocess(args, X)
+        X_phi, phi, std = preprocess(args, X, Y)
 
         # Partitioning datasets
         logging.info('Partitioning datasets...')
@@ -162,13 +190,15 @@ def train(args):
         Y_Test = []
         
         if args.permu == 'balance':
+            fracs = [float(f) for f in args.frac.split(',')]
             for k in xrange(num_classes):
                 begin = parts[k, 0]
                 end = begin + parts[k, 1]
                 inds = range(begin, end)
                 np.random.shuffle(inds)
                 nk = parts[k, 1]
-                nk_train = int(FRAC * nk)
+                frac = fracs[k]
+                nk_train = int(frac * nk)
                 
                 X_phi_Train.append(X_phi[inds[:nk_train]])
                 Y_Train.append(Y[inds[:nk_train]])
@@ -194,6 +224,7 @@ def train(args):
             X_phi_Test = X_phi_Test[inds_test]
             Y_Test = Y_Test[inds_test]
         else:
+            FRAC = float(args.frac)
             n_train = int(float(num_samples) * FRAC)
             inds = range(num_samples)
             np.random.shuffle(inds)
@@ -244,11 +275,11 @@ if __name__ == '__main__':
     parser.add_argument('--model', help='gen/dis model', 
             choices=['gen', 'dis'], type=str, default='dis')
     parser.add_argument('--pre', help='gen/dis model', 
-            choices=['pca', 'hist'], type=str, default='pca')
+            choices=['pca', 'hist', 'lda'], type=str, default='pca')
     parser.add_argument('--permu', help='train/test task', 
             choices=['unbalance', 'balance'], type=str, default='unbalance')
     parser.add_argument('--d', help='pca dimension', type=int, default=2)
-    parser.add_argument('--frac', help='fraction of training set', type=float, default=0.8)
+    parser.add_argument('--frac', help='fraction of training set', type=str, default='0.8')
     parser.add_argument('--tolerance', help='tolerance of error rate', type=float, default=0.01)
     parser.add_argument('--lr', help='learning rate', type=float, default=0.01)
     parser.add_argument('--epoch', help='epoch', type=int, default=20)
