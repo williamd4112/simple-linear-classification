@@ -8,21 +8,29 @@ from tqdm import *
 from util import one_hot
 from plot import plot_decision_boundary
 from preprocess import Preprocessor
-from model_np import ProbabilisticGenerativeModel, LogisticRegressionModel
+from model_np import ProbabilisticGenerativeModel, ProbabilisticDiscriminativeModel
 
-def get_model(args, num_classes):
+def get_model(args):
     if args.model == 'gen':
-        return ProbabilisticGenerativeModel(num_classes)
+        return ProbabilisticGenerativeModel()
     else:
-        return LogisticRegressionModel(num_classes, lr=args.lr, tolerance=args.tolerance)
+        return ProbabilisticDiscriminativeModel(lr=args.lr, 
+                                                epochs=args.epoch, 
+                                                batch_size=args.batch_size,
+                                                tolerance=args.tolerance)
 
 def get_model_test(args):
     assert args.load != None
     if args.model == 'gen':
         model = ProbabilisticGenerativeModel()
     else:
-        model = LogisticRegressionModel(lr=args.lr, tolerance=args.tolerance)
+        model = ProbabilisticDiscriminativeModel(lr=None, 
+                                                epochs=None, 
+                                                batch_size=None,
+                                                tolerance=None)
+    
     model.load(args.load)
+
     return model
 
 def load(args):
@@ -126,22 +134,22 @@ def train(args):
         Y.append(y)
         count += len(x)
         logging.info('Load %d data for class %d' % (len(x), i))
-    X = np.concatenate(X)
-    Y = np.concatenate(Y)
+    X = np.asarray(np.concatenate(X))
+    Y = np.asarray(np.concatenate(Y))
     num_samples = len(X)
      
     # Perform task
     if args.task == 'eval':
         assert args.load != None and args.basis != None and args.std != None
         model, std, phi = load(args)
-
+        
         logging.info('Preprocessing %d data...' % len(X))
         X_phi = preprocess_test(X, std, phi)
 
         logging.info('Evaluating...')
         evaluate(args, model, X_phi, Y)
     else:    
-        model = get_model(args, num_classes)
+        model = get_model(args)
         # Preprocess datasets
         logging.info('Preprocessing %d data...' % num_samples)
         X_phi, phi, std = preprocess(args, X)
@@ -203,7 +211,7 @@ def train(args):
         logging.info('Use model %s with %d-dim (with bias) feautre space' % (args.model, X_phi.shape[1]))
         sess = None
         logging.info('Training...')
-        model.fit(sess, X_phi_Train, Y_Train, args.epoch, args.batch_size)
+        model.fit(sess, X_phi_Train, Y_Train)        
 
         if args.task == 'validate':
             logging.info('Evaluating testing accuracy...')
