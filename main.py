@@ -87,7 +87,7 @@ def load_dataset_with_class(args):
         X.append(x)
         Y.append(y)
         count += len(x)
-        logging.info('Load %d data for class %d' % (len(x), i))
+        logging.info('Load %d data for class %d from %s' % (len(x), i, datasets[i]))
     X = np.asarray(np.concatenate(X))
     Y = np.asarray(np.concatenate(Y))
 
@@ -121,8 +121,8 @@ def test(args):
     for path in datasets:
         x = np.load(path).astype(np.float32)
         X.append(x)
+        logging.info('Load %d data from %s' % (len(x), path))
     X = np.asarray(np.concatenate(X))
-    logging.info('Load %d data' % (len(X)))
 
     model, std, phi = load(args)
 
@@ -145,27 +145,10 @@ def test(args):
             csv_file.write(','.join([str(yn_i) for yn_i in yn]) + '\n')
 
 def train(args):
-    X = []
-    Y = []
-    
-    # Load datasets class by class
-    datasets = args.X.split(',')
-    num_classes = len(datasets)
-    parts = np.zeros([num_classes, 2], dtype=np.int32)
-    count = 0
-    for i in xrange(num_classes):
-        x = np.matrix(np.load(datasets[i]), dtype=np.float32)
-        y = np.tile(one_hot(num_classes, i), [len(x), 1]).astype(dtype=np.float32)
-        parts[i, 0] = count
-        parts[i, 1] = len(x)
-        X.append(x)
-        Y.append(y)
-        count += len(x)
-        logging.info('Load %d data for class %d' % (len(x), i))
-    X = np.asarray(np.concatenate(X))
-    Y = np.asarray(np.concatenate(Y))
-    num_samples = len(X)
-     
+    X, Y, parts = load_dataset_with_class(args)
+    num_samples = X.shape[0]
+    num_classes = Y.shape[1]
+ 
     # Perform task
     if args.task == 'eval':
         assert args.load != None and args.basis != None and args.std != None

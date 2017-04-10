@@ -13,12 +13,16 @@ from os.path import isfile, join
     mypath: input directory
     out: output directory
 '''
+import logging
+
+logging.basicConfig(format='[%(asctime)s] %(message)s', datefmt='%m/%d/%Y %I:%M:%S %p', level=logging.INFO)
 
 mypath = sys.argv[1]
 out = sys.argv[2]
 
 onlyfiles = [f for f in listdir(mypath) if isfile(join(mypath, f))]
 
+logging.info('Convert images at %s to %s' % (mypath, out))
 datas = []
 for i in tqdm(range(len(onlyfiles))):
     img = cv2.cvtColor(cv2.imread(mypath + '/' + onlyfiles[i]), cv2.COLOR_RGB2GRAY)
