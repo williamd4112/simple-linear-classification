@@ -90,9 +90,9 @@ def test(args):
     # Load datasets without class
     datasets = args.X.split(',')
     for path in datasets:
-        x = np.matrix(np.load(path), dtype=np.float32)
+        x = np.load(path).astype(np.float32)
         X.append(x)
-    X = np.concatenate(X)
+    X = np.asarray(np.concatenate(X))
     logging.info('Load %d data' % (len(X)))
 
     model, std, phi = load(args)
