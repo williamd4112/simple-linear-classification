@@ -135,7 +135,7 @@ class ProbabilisticGenerativeModel(object):
 
         priors = np.zeros([K, 1])
         means = np.zeros([K, M-1])
-        sigma = np.zeros([M, M-1])
+        sigma = np.zeros([M-1, M-1])
     
         for class_i, i in zip(self.classes, range(K)):
             x_i = x_[t_[:, i] == 1][:, 1:]
@@ -143,7 +143,7 @@ class ProbabilisticGenerativeModel(object):
 
             priors[i] = float(n_i) / N
             means[i] = np.mean(x_i, axis=0)
-            sigma = (float(n_i) / N) * ((x_i - means[i]).T.dot(x_i - means[i])) / float(n_i)
+            sigma += (float(n_i) / N) * ((x_i - means[i]).T.dot(x_i - means[i])) / float(n_i)
         sigma_inv = np.asarray(np.linalg.pinv(sigma))
         
         for i in xrange(K):
