@@ -1,7 +1,7 @@
 # Introduction
 This project is implementation of **Probabilistic Generative Model** and **Probabilistic Discriminative Model** for multi-class classification. (*see Pattern Recognition and Machine Learning, Bishop 2006*)
 Classifcation task can be splitted into two stages - inference and decision.  Probabilistic Generative Model solve class posteriror via solving class conditional probabilities and class priors. 
-Probabilistic Discriminative Model solve directly optimize linear combination weight with **Iterative Reweighted Least Squares - Newton-Raphson** to find class posteriror.
+Probabilistic Discriminative Model solve directly optimize linear combination weight with **Iterative Reweighted Least Squares - Newton-Raphson** to find class posteriror.  All datas are processed with **Principle Component Analysis** or **Linear Discriminant Analysis**.
 
 # Dataset
 Database of Faces ( AT&T Laboratories Cambridge)    
