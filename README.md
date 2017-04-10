@@ -3,6 +3,11 @@ This project is implementation of **Probabilistic Generative Model** and **Proba
 Classifcation task can be splitted into two stages - inference and decision.  Probabilistic Generative Model solve class posteriror via solving class conditional probabilities and class priors. 
 Probabilistic Discriminative Model solve directly optimize linear combination weight with **Iterative Reweighted Least Squares (IRLS) - Newton-Raphson** to find class posteriror.  All datas are processed with **Principle Component Analysis (PCA)** or **Linear Discriminant Analysis (LDA)**.
 
+# Dependencies
+- numpy v1.12
+- tqdm
+- OpenCV
+
 # Dataset
 Database of Faces ( AT&T Laboratories Cambridge)    
 Reference : http://www.cl.cam.ac.uk/research/dtg/attarchive/facedatabase.html
