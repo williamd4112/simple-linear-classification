@@ -29,7 +29,36 @@ Training scripts use default training data in data/class*.npy and default traini
 
 # To validate the model (examples)
 ```
-./validate_generative.sh {model output path}
-./validate_dicriminative.sh {model output path}
-./validate_dicriminative_lda.sh {model output path}
+./validate_generative.sh
+./validate_dicriminative.sh 
+./validate_dicriminative_lda.sh 
+```
+
+# To test the model (examples)
+```
+./test.sh {model input} {result output} {testing data} {model type [dis|gen]}
+
+e.g.
+./test.sh model/model-dis data/class1.npy,data/class2.npy,data/class3.npy dis
+```
+
+# To run demo
+```
+./demo.sh {model input} {model type [dis|gen]}
+
+e.g.
+./demo.sh model/model-dis dis
+
+[04/11/2017 02:06:24 AM] Convert images at ./Demo to data/demo.npy
+100%|██████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 600/600 [00:00<00:00, 76795.31it/s]
+Demo images convertion done
+[04/11/2017 02:06:24 AM] Load 600 data from ./data/demo.npy
+[04/11/2017 02:06:24 AM] Loading stddev from model/model-dis_std.npy ...
+[04/11/2017 02:06:24 AM] Loading basis from model/model-dis_basis.npy ...
+[04/11/2017 02:06:24 AM] Loading model from model/model-dis.npy success [K = 3, M = 3]
+[04/11/2017 02:06:24 AM] Use model dis with 3-dim (with bias) feautre space
+[04/11/2017 02:06:24 AM] Converting to one-hot ...
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 600/600 [00:00<00:00, 908841.60it/s]
+[04/11/2017 02:06:24 AM] Writing result to ./result/DemoTarget.csv ...
+100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 600/600 [00:00<00:00, 263848.02it/s]
 ```
