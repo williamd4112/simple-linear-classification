@@ -47,13 +47,12 @@ class Preprocessor(object):
             S_B += n * (mean - mean_all).dot((mean - mean_all))
 
         eig_vals, eig_vecs = np.linalg.eig(np.linalg.inv(S_W).dot(S_B))
-
         for i in range(len(eig_vals)):
             eigvec_sc = eig_vecs[:,i].reshape(M, 1)   
         
         eig_pairs = [(np.abs(eig_vals[i]), eig_vecs[:,i]) for i in range(len(eig_vals))]
         eig_pairs = sorted(eig_pairs, key=lambda k: k[0], reverse=True)
-        eig_pairs = np.hstack(([eig_pairs[i][1].reshape(M,1) for i in xrange(d)])).T.astype(np.float32)
+        eig_pairs = np.array(([eig_pairs[i][1] for i in xrange(d)])).astype(np.float32)
         
         return X.dot(eig_pairs.T), eig_pairs        
 

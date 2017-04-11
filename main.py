@@ -109,7 +109,7 @@ def plot(args):
         y = model.test(sess, X_phi)
         return y.argmax(axis=1)
 
-    plot_decision_boundary(func, x_phi, t_, x_phi.min(), x_phi.min(), x_phi.max(), x_phi.max(), 0.01) 
+    plot_decision_boundary(func, x_phi, t_, x_phi.min(), x_phi.min(), x_phi.max(), x_phi.max(), 0.1) 
         
 def test(args):
     assert args.output != None and args.load != None
